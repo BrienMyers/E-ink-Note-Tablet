@@ -1,10 +1,12 @@
+from multiprocessing.pool import INIT
 import numpy
 import threading
-
-# Digitizer Code
 import board
-import adafruit_tsc2007
+import time
+from PIL import Image,ImageDraw,ImageFont
+from pisugar import PiSugarServer
 
+#Digitizer Code
 # Use for I2C
 i2c = board.I2C()  # uses board.SCL and board.SDA
 # i2c = board.STEMMA_I2C()  # For using the built-in STEMMA QT connector on a microcontroller
@@ -21,15 +23,14 @@ tsc = adafruit_tsc2007.TSC2007(i2c, irq=irq_dio)
 #E-ink Code
 import sys
 import os
-picdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'pic')
-libdir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'lib')
+picdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'pic')
+libdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib')
 if os.path.exists(libdir):
     sys.path.append(libdir)
-
 from waveshare_epd import epd7in5b_V2
-import time
-from PIL import Image,ImageDraw,ImageFont
+import adafruit_tsc2007
 
+pisugar = PiSugarServer()
 epd = epd7in5b_V2.EPD()
 epd.init_Fast()
 epd.Clear()
@@ -48,9 +49,9 @@ drawHeight = 700
 drawX = drawWidth/4095
 drawY = drawHeight/4095
 
-imgUI = Image.open('InkNoteUI.bmp')
-imgUIRed = Image.open('InkNoteUIRed.bmp')
-imgMenu = Image.open('MenuUI.bmp')
+imgUI = Image.open(os.path.join(picdir, 'InkNoteUI.bmp'))
+imgUIRed = Image.open(os.path.join(picdir, 'InkNoteUIRed.bmp'))
+imgMenu = Image.open(os.path.join(picdir, 'MenuUI.bmp'))
 imgMenuBack = Image.new('RGB', (widthPx, heightPx), 'white')
 imgMenuBackRed = Image.new('RGB', (widthPx, heightPx), 'white')
 
@@ -79,13 +80,13 @@ imgFullRed = Image.new('1', (widthPx, heightPx), 255)
 UIBox = (0, 0)
 drawBox = (0, 100)
 
-imgFull.paste(imgUI, UIBox)
-imgFull.paste(imgDraw, drawBox)
+#imgFull.paste(imgUI, UIBox)
+#imgFull.paste(imgDraw, drawBox)
 
-imgFullRed.paste(imgUIRed, UIBox)
-imgFullRed.paste(imgDrawRed, drawBox)
+#imgFullRed.paste(imgUIRed, UIBox)
+#imgFullRed.paste(imgDrawRed, drawBox)
 
-epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
+#epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
 
 #epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFull))
 
@@ -95,19 +96,51 @@ epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
 
 #epd.display_Partial(epd.getbuffer(imgFull), imgMenu, 120, 200, 360, 600)
 
+def checkBattery():
+    #poll the raspberry pi for battery percentage
+    imgFull.draw.line([(300,34.8),(375, 34.8)], fill=colorBlack, width=2.784, joint=None)
+    battery_level = pisugar.get_battery_level()
+    if 0 <= battery_level <= 25:
+        imgFull.draw.rounded_rectangle([303, 6, 319, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([321, 6, 337, 32], 2, colorWhite, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([339, 6, 355, 32], 2, colorWhite, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([357, 6, 373, 32], 2, colorWhite, outline=None, width=1)
+    if 25 < battery_level <= 50:  
+        imgFull.draw.rounded_rectangle([303, 6, 319, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([321, 6, 337, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([339, 6, 355, 32], 2, colorWhite, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([357, 6, 373, 32], 2, colorWhite, outline=None, width=1)
+
+    if 50 < battery_level <= 75:
+        imgFull.draw.rounded_rectangle([303, 6, 319, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([321, 6, 337, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([339, 6, 355, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([357, 6, 373, 32], 2, colorWhite, outline=None, width=1)
+    if 75 < battery_level <= 100:
+        imgFull.draw.rounded_rectangle([303, 6, 319, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([321, 6, 337, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([339, 6, 355, 32], 2, colorBlack, outline=None, width=1)
+        imgFull.draw.rounded_rectangle([357, 6, 373, 32], 2, colorBlack, outline=None, width=1)
+
+def initialize_InkNote():
+    checkBattery()
+    imgFull.paste(imgUI, UIBox)
+    imgFull.paste(imgDraw, drawBox)
+
+    imgFullRed.paste(imgUIRed, UIBox)
+    imgFullRed.paste(imgDrawRed, drawBox)
+
+    epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
+
+
 def update_Screen():
+    checkBattery()
     imgFull.paste(imgUI, UIBox)
     imgFull.paste(imgDraw, drawBox)
     imgFullRed.paste(imgUIRed, UIBox)
     imgFullRed.paste(imgDrawRed, drawBox)
     epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
     return
-
-def checkBattery():
-    #poll the raspberry pi for battery percentage
-    #choose a battery image based on percentage
-    #paste battery image to full image
-    placeholder0 = 0
 
 def save():
     #Paste saveui to full image
@@ -145,22 +178,23 @@ def menu():
         if 120 <= xPos <= 360:
             if 200 >= yPos <= 300:  #Return to main function
                 navMenu = False
+                update_Screen()
                 break
             if 300 > yPos <= 400:   #Save/Export File
                 #Display ui for saving as bmp or png/jpg
                 #save drawing area as image into saved folder in the file format chosen
+                update_Screen()
                 continue
             if 400 > yPos <= 500:   #Load saved file
                 #Display ui for all the saved bmp files
                 #Load chosen saved image into drawing area
+                update_Screen()
                 continue
             if 500 > yPos <= 600:   #Quit app
                 keepDrawing = False
                 return keepDrawing
                 
             #epd.display_Partial(epd.getbuffer(imFull), 120, 200, 360, 600)
-            #set to update screen only when a menu button is actually pressed
-            update_Screen()
         return keepDrawing
 
 def draw_Pixels(radius, color):
@@ -193,6 +227,7 @@ def draw_Pixels(radius, color):
 
 
 def main():
+    initialize_InkNote()
     drawing = True
     drawColor = colorBlack
     thickness = 2
