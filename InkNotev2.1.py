@@ -123,12 +123,12 @@ def checkBattery():
         imgFull.draw.rounded_rectangle([357, 6, 373, 32], 2, colorBlack, outline=None, width=1)
 
 def initialize_InkNote():
-    checkBattery()
     imgFull.paste(imgUI, UIBox)
     imgFull.paste(imgDraw, drawBox)
 
     imgFullRed.paste(imgUIRed, UIBox)
     imgFullRed.paste(imgDrawRed, drawBox)
+    #checkBattery()
 
     epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
 
@@ -199,7 +199,9 @@ def menu():
 
 def draw_Pixels(radius, color):
     circleColor = color
+    draw_Radius = radius
     noting = True
+    drawing_Start = time.monotonic() #Measure first time
     while noting == True:
         while tsc.touched:
             point = tsc.touch
@@ -209,18 +211,21 @@ def draw_Pixels(radius, color):
             #xPos = int(point["x"]*xscale)
             yPos = int((point["y"]*yscale))
             xPos = int(point["x"]*xscale)
+            drawing_Start = time.monotonic() #New time measurement every time screen is touched
             if circleColor == colorBlack:
-                drawImg.circle((xPos,yPos), radius, circleColor, circleColor, 1)
+                drawImg.circle((xPos,yPos), draw_Radius, circleColor, circleColor, 1)
                 #drawImg.putpixel((yPos,xPos),drawColor) # Edit image based on coordinates of points touched
             if circleColor == colorRed:
-                drawImgRed.circle((xPos,yPos), radius, colorBlack, colorBlack, 1)
+                drawImgRed.circle((xPos,yPos), draw_Radius, colorBlack, colorBlack, 1)
                 #drawImgRed.putpixel((yPos,xPos),colorBlack) # Edit image based on coordinates of points touched
             if circleColor == colorWhite:
-                drawImg.circle((xPos,yPos), radius, circleColor, circleColor, 1)
-                drawImgRed.circle((yPos,xPos), radius, circleColor, circleColor, 1)
+                drawImg.circle((xPos,yPos), draw_Radius, circleColor, circleColor, 1)
+                drawImgRed.circle((yPos,xPos), draw_Radius, circleColor, circleColor, 1)
                 #drawImg.putpixel((yPos,xPos),drawColor) # Edit image based on coordinates of points touched
                 #drawImgRed.putpixel((yPos,xPos),colorBlack) # Edit image based on coordinates of points touched
-        time.sleep(1)
+        drawing_Stop = time.monotonic() - drawing_Start
+        if drawing_Stop >= 1:
+            noting = False
         noting = False
     update_Screen()
     return
