@@ -25,6 +25,8 @@ import sys
 import os
 picdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'pic')
 libdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'lib')
+exportdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'export')
+saveddir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'saved')
 if os.path.exists(libdir):
     sys.path.append(libdir)
 from waveshare_epd import epd7in5b_V2
@@ -61,8 +63,8 @@ drawImg = ImageDraw.Draw(imgDraw)
 drawImgRed = ImageDraw.Draw(imgDrawRed)
 aryDraw = numpy.array(imgDraw)
 
-imgSaveOptions = Image.open('SaveOptions.bmp') 
-imgLoadOptions = Image.open('LoadOptions.bmp')
+imgSave = Image.open(os.path.join(picdir, 'SaveOptions.bmp')) 
+imgLoad = Image.open(os.path.join(picdir, 'LoadOptions.bmp'))
 
 #imgDraw.putpixel((position),(color))
 #img.save('drawTemp.bmp', 'BMP')
@@ -79,6 +81,9 @@ imgFullRed = Image.new('1', (widthPx, heightPx), 255)
 #Merge the two images before performing partial update or display to screen
 UIBox = (0, 0)
 drawBox = (0, 100)
+previewBox = (17, 20)
+
+numSaved = 0
 
 #imgFull.paste(imgUI, UIBox)
 #imgFull.paste(imgDraw, drawBox)
@@ -123,44 +128,165 @@ def checkBattery():
         imgFull.draw.rounded_rectangle([357, 6, 373, 32], 2, colorBlack, outline=None, width=1)
 
 def initialize_InkNote():
+    #freshBoot = True
+    #load(freshBoot)
+
+
     imgFull.paste(imgUI, UIBox)
     imgFull.paste(imgDraw, drawBox)
 
     imgFullRed.paste(imgUIRed, UIBox)
     imgFullRed.paste(imgDrawRed, drawBox)
-    #checkBattery()
+    checkBattery()
 
     epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
 
-
 def update_Screen():
-    checkBattery()
     imgFull.paste(imgUI, UIBox)
     imgFull.paste(imgDraw, drawBox)
     imgFullRed.paste(imgUIRed, UIBox)
     imgFullRed.paste(imgDrawRed, drawBox)
+    checkBattery()
     epd.display(epd.getbuffer(imgFull), epd.getbuffer(imgFullRed))
     return
 
-def save():
-    #Paste saveui to full image
-    #display full image
-    #while loop for selection options
-        #Option for save as BMP
-        #Option for Exporting
-            #Option for save as PNG
-            #Option for save as JPG
-                #Option for image upscaling
-    placeholder1 = 1
+def saveconvert(): #Converts and merges the black and red drawing images and returns it
+    imgdrawSave = imgDraw.copy()
+    imgdrawSaveRed = imgDrawRed.copy()
+    imgdrawSave.convert("RGBA")
+    imgdrawSaveRed.convert("RGBA")
+    drawData = imgdrawSave.getdata()
+    redDrawData = imgdrawSave.getdata()
 
-def load():
+    newDrawData = []
+
+    for item in drawData:
+        if item[0] == 255 and item[1] == 255 and item[2] == 255:
+            newDrawData.append((255, 255, 255, 0))
+        else:
+            newDrawData.append(item)
+
+    newRedDrawData = []
+
+    for item in redDrawData:
+        if item[0] == 255 and item[1] == 255 and item[2] == 255:
+            newRedDrawData.append((255, 255, 255, 0))
+        else:
+            newRedDrawData.append(item)
+
+    imgdrawSave.putdata(newDrawData)
+    imgdrawSaveRed.putdata(newRedDrawData)
+
+    imgdrawSave.paste(imgdrawSaveRed, UIBox)
+
+    finalDrawData = imgdrawSave.getdata()
+
+    finalNewData = []
+
+    for item in redDrawData:
+        if item[0] == 255 and item[1] == 255 and item[2] == 255:
+            newRedDrawData.append((255, 255, 255, 255))
+        else:
+            newRedDrawData.append(item)
+
+    imgdrawSave.putdata(finalNewData)
+
+    return imgdrawSave
+
+def saving():
+    saving = True
+    saveState = ".bmp"
+    resolution = (480, 800)
+
+    imgMenuBack.paste(imgSave, UIBox) #Paste to saveui img
+
+    #convert drawImg to Preview
+    imgdrawPreview = imgDraw.copy()
+    imgdrawPreviewRed = imgDrawRed.copy()
+    imgdrawPreview = imgDraw.resize([300, 440])
+    imgdrawPreviewRed = imgDrawRed.resize([300, 440])
+    
+    #Paste saveui to full image
+    imgMenuBack.paste(imgdrawPreview, previewBox)
+    imgMenuBackRed.paste(imgdrawPreviewRed, previewBox)
+    epd.display(epd.getbuffer(imgMenuBack), epd.getbuffer(imgMenuBackRed))  #Diplay saveui
+
+    while saving == True:
+        point = tsc.touch
+        if point["pressure"] < 20: # ignore touches with no 'pressure' as false
+            continue
+        yPos = int(point["y"]*yscale)
+        xPos = int(point["x"]*xscale)
+
+        #Save
+        if (21 <= yPos <= 110 and 325 <= xPos <= 462):
+            saveState = ".bmp"
+        #Export
+        if (138 >= yPos <= 228 and 325 >= xPos <= 462):
+            saveState = ".png"
+        #PNG
+        if (254 >= yPos <= 346 and 325 >= xPos <= 462):
+            saveState = ".png"
+        #JPEG
+        if (373 >= yPos <= 460 and 325 >= xPos <= 462):
+            saveState = ".jpg"
+        #Resolution
+        #480x700
+        if (532 >= yPos <= 590 and 23 >= xPos <= 455):
+            resolution = (480, 800)
+        #960x1400
+        if (590 > yPos <= 647 and 23 >= xPos <= 455):
+            resolution = (960, 1400)
+        #1440x210
+        if (647 >= yPos <= 705 and 23 >= xPos <= 455):
+            resolution = (1440, 2100)
+        #Return
+        if (717 >= yPos <= 784 and 39 >= xPos <= 204):
+            saving = False
+            break
+        #confirm
+        if (717 >= yPos <= 784 and 282 >= xPos <= 445):
+            if saveState == ".bmp":
+                imgDraw.save(os.path.join(exportdir, 'NoteBlack' + numSaved + saveState))
+                imgDrawRed.save(os.path.join(exportdir, 'NoteRed' + numSaved + saveState))
+       
+            if (saveState == ".png" or saveState == ".jpg"):
+            
+                imgExport = saveconvert()
+                imgExport.resize(resolution)
+                imgExport.save( os.path.join(exportdir, 'Note' + numSaved + saveState))
+
+def quicksave():
+    imgDraw.save(os.path.join(exportdir, 'NoteBlack' + numSaved + '.bmp'))
+    imgDrawRed.save(os.path.join(exportdir, 'NoteRed' + numSaved + '.bmp'))
+
+
+def load(firstLoad):
+    #Check how many files in saved /2
+    #numSaved = 0
     #Paste Load UI to full image
     #Paste all saved bmp to full image as thumbnails/preview images
-    #while loop for selecting which image to load
-        #paste saved image to draw area
-        #display full image
-        #return to menu then main
-    placeholder2 = 2
+
+    loading = True  #while loop for selecting which image to load
+    while loading == True:
+        point = tsc.touch
+        if point["pressure"] < 20: # ignore touches with no 'pressure' as false
+            continue
+        yPos = int(point["y"]*yscale)
+        xPos = int(point["x"]*xscale)
+        #if firstLoad == True
+            #paste blank space on return
+        #if new
+            #firstLoad = False
+            #check if current img is in saved
+            #create new blank img for draw 
+        #if load option
+            #open draw img and paste to full img
+            #display full img
+            #firstLoad = False
+        #if return 
+            #if firstLoad == False
+                #go to main
 
 def menu():
     imgMenuBack.paste(imgMenu, (120, 200))
@@ -255,6 +381,9 @@ def main():
                                 epd.sleep()
                                 quit()
                         break
+                    #Quick Save
+                    if 98 >= xPos <= 160:
+                        quicksave()
                     #Change color of pen
                     if  420 >= xPos <= 480: #old x-min = 433
                         if  0 <= yPos <= 37:
